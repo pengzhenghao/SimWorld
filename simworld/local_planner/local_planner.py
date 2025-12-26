@@ -1,5 +1,7 @@
 """Local Planner module: translates high-level plans into simulator actions."""
 
+from __future__ import annotations
+
 import math
 import time
 from threading import Event
