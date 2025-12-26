@@ -16,6 +16,12 @@ import numpy as np
 import PIL.Image
 import unrealcv
 
+# Optional import for Jupyter notebook support
+try:
+    from IPython.display import display
+except ImportError:
+    display = None
+
 from simworld.utils.logger import Logger
 
 
@@ -38,7 +44,18 @@ class UnrealCV(object):
         self.ip = ip
         # Build a client to connect to the environment
         self.client = unrealcv.Client((ip, port))
-        self.client.connect()
+        
+        # Connect with timeout if specified
+        if connect_timeout_s is not None:
+            start_time = time.time()
+            self.client.connect()
+            while not self.client.isconnected():
+                if time.time() - start_time > connect_timeout_s:
+                    raise TimeoutError(f"Failed to connect to UnrealCV server at {ip}:{port} within {connect_timeout_s}s")
+                time.sleep(0.1)
+                self.client.connect()
+        else:
+            self.client.connect()
 
         self.resolution = resolution
 
@@ -647,7 +664,7 @@ class UnrealCV(object):
         cmd = f'vbp {object_name} TurnAround {1} {angle} {clockwise}'
         with self.lock:
             self.client.request(cmd)
-        time.sleep(1)
+        time.sleep(0.1)
 
     def humanoid_stop(self, object_name):
         """Stop humanoid.
@@ -1016,40 +1033,43 @@ class UnrealCV(object):
             img: Image.
             title: Title, defaults to "raw_img".
         """
-        try:
-            from IPython.display import display  # type: ignore
+        # Try to display in Jupyter notebook if IPython is available
+        if display is not None:
+            try:
+                # Check if the image is a depth image (single channel)
+                if len(img.shape) == 2:
+                    # Normalize depth image for display
+                    img_normalized = img / img.max()
+                    # Convert to 8-bit grayscale
+                    img_display = (img_normalized * 255).astype(np.uint8)
+                    # Convert to RGB for display
+                    img_rgb = cv2.cvtColor(img_display, cv2.COLOR_GRAY2RGB)
+                else:
+                    # Convert OpenCV BGR image to RGB
+                    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            # Check if the image is a depth image (single channel)
-            if len(img.shape) == 2:
-                # Normalize depth image for display
-                img_normalized = img / img.max()
-                # Convert to 8-bit grayscale
-                img_display = (img_normalized * 255).astype(np.uint8)
-                # Convert to RGB for display
-                img_rgb = cv2.cvtColor(img_display, cv2.COLOR_GRAY2RGB)
-            else:
-                # Convert OpenCV BGR image to RGB
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                # Ensure the image is in uint8 format before converting to PIL Image
+                if img_rgb.dtype != np.uint8:
+                    img_rgb = (img_rgb * 255).astype(np.uint8)
 
-            # Ensure the image is in uint8 format before converting to PIL Image
-            if img_rgb.dtype != np.uint8:
-                img_rgb = (img_rgb * 255).astype(np.uint8)
-
-            # Convert to PIL Image
-            pil_img = PIL.Image.fromarray(img_rgb)
-            # Display in notebook
-            display(pil_img)
-        except ImportError:
-            # Fallback to OpenCV display if not in notebook
-            if len(img.shape) == 2:
-                # Normalize depth image for display
-                img_normalized = img / img.max()
-                # Convert to 8-bit grayscale
-                img_display = (img_normalized * 255).astype(np.uint8)
-                cv2.imshow(title, img_display)
-            else:
-                cv2.imshow(title, img)
-            cv2.waitKey(3)
+                # Convert to PIL Image
+                pil_img = PIL.Image.fromarray(img_rgb)
+                # Display in notebook
+                display(pil_img)
+                return
+            except Exception:
+                pass  # Fall through to OpenCV display
+        
+        # Fallback to OpenCV display if not in notebook
+        if len(img.shape) == 2:
+            # Normalize depth image for display
+            img_normalized = img / img.max()
+            # Convert to 8-bit grayscale
+            img_display = (img_normalized * 255).astype(np.uint8)
+            cv2.imshow(title, img_display)
+        else:
+            cv2.imshow(title, img)
+        cv2.waitKey(3)
 
     def get_image(self, cam_id, viewmode, mode='direct', img_path=None):
         """Get image.

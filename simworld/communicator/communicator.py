@@ -11,10 +11,6 @@ from threading import Lock
 import numpy as np
 import pandas as pd
 
-from simworld.agent.humanoid import Humanoid
-from simworld.agent.pedestrian import Pedestrian
-from simworld.agent.scooter import Scooter
-from simworld.agent.vehicle import Vehicle
 from simworld.communicator.unrealcv import UnrealCV
 from simworld.utils.load_json import load_json
 from simworld.utils.logger import Logger
@@ -466,10 +462,10 @@ class Communicator:
         """
         collision_json = self.unrealcv.get_collision_num(self.get_humanoid_name(humanoid_id))
         collision_data = json.loads(collision_json)
-        human_collision_num = int(collision_data['HumanCollision'])
-        object_collision_num = int(collision_data['ObjectCollision'])
-        building_collision_num = int(collision_data['BuildingCollision'])
-        vehicle_collision_num = int(collision_data['VehicleCollision'])
+        human_collision_num = int(collision_data.get('HumanCollision', 0))
+        object_collision_num = int(collision_data.get('ObjectCollision', 0))
+        building_collision_num = int(collision_data.get('BuildingCollision', 0))
+        vehicle_collision_num = int(collision_data.get('VehicleCollision', 0))
         return human_collision_num, object_collision_num, building_collision_num, vehicle_collision_num
 
     def get_position_and_direction(self, vehicle_ids=[], pedestrian_ids=[], traffic_signal_ids=[], humanoid_ids=[], scooter_ids=[]):
@@ -883,6 +879,12 @@ class Communicator:
     # Utility methods
     def clear_env(self, keep_roads=False):
         """Clear all objects in the environment."""
+        # Import agent classes here to avoid circular import
+        from simworld.agent.humanoid import Humanoid
+        from simworld.agent.pedestrian import Pedestrian
+        from simworld.agent.scooter import Scooter
+        from simworld.agent.vehicle import Vehicle
+        
         # Get all objects in the environment
         objects = [obj.lower() for obj in self.unrealcv.get_objects()]  # Convert objects to lowercase
         # Define unwanted objects

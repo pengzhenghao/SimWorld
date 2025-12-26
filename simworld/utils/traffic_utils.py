@@ -1,5 +1,7 @@
 """Utility functions for traffic simulation and route generation."""
 
+from __future__ import annotations
+
 import numpy as np
 
 from simworld.utils.vector import Vector

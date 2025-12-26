@@ -1,5 +1,7 @@
 """Base LLM class for handling interactions with language models."""
 
+from __future__ import annotations
+
 import inspect
 import os
 import time

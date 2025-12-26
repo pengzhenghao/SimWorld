@@ -1,5 +1,7 @@
 """Utilities for recording simulation videos and logging metadata."""
 
+from __future__ import annotations
+
 import csv
 import os
 import random

@@ -1,4 +1,6 @@
 """Vehicle agent module for simulating vehicles in traffic."""
+from __future__ import annotations
+
 from enum import Enum, auto
 
 import numpy as np
