@@ -15,7 +15,6 @@ import cv2
 import numpy as np
 import PIL.Image
 import unrealcv
-from IPython.display import display
 
 from simworld.utils.logger import Logger
 
@@ -27,13 +26,14 @@ class UnrealCV(object):
     including basic operations and traffic system operations.
     """
 
-    def __init__(self, port=9000, ip='127.0.0.1', resolution=(1280, 720)):
+    def __init__(self, port=9000, ip='127.0.0.1', resolution=(1280, 720), connect_timeout_s: float | None = None):
         """Initialize the UnrealCV client.
 
         Args:
             port: Connection port, defaults to 9000.
             ip: Connection IP address, defaults to 127.0.0.1.
             resolution: Resolution, defaults to (320, 240).
+            connect_timeout_s: Optional timeout for connecting to the UE UnrealCV server. If exceeded, raises TimeoutError.
         """
         self.ip = ip
         # Build a client to connect to the environment
@@ -44,6 +44,7 @@ class UnrealCV(object):
 
         self.lock = Lock()
         self.logger = Logger.get_logger('UnrealCV')
+        self.connect_timeout_s = connect_timeout_s
         self.ini_unrealcv(resolution)
 
     ###################################################
@@ -59,16 +60,26 @@ class UnrealCV(object):
         Args:
             resolution: Resolution, defaults to (320, 240).
         """
-        self.check_connection()
+        self.check_connection(timeout_s=self.connect_timeout_s)
         [w, h] = resolution
         self.client.request(f'vrun setres {w}x{h}w', -1)  # Set resolution of display window
 
         self.client.request('vrun Editor.AsyncSkinnedAssetCompilation 2', -1)  # To correctly load the character
         time.sleep(1)
 
-    def check_connection(self):
-        """Check connection status, attempt to reconnect if not connected."""
+    def check_connection(self, timeout_s: float | None = None):
+        """Check connection status, attempt to reconnect if not connected.
+
+        Args:
+            timeout_s: Optional timeout in seconds. If exceeded, raises TimeoutError.
+        """
+        start_t = time.time()
         while self.client.isconnected() is False:
+            if timeout_s is not None and (time.time() - start_t) > float(timeout_s):
+                raise TimeoutError(
+                    f'UnrealCV server not reachable at {self.ip}. '
+                    f'Waited {timeout_s}s. Is the UE server running and exposing UnrealCV on the configured port?'
+                )
             self.logger.error('UnrealCV server is not running. Please try again')
             time.sleep(1)
             self.client.connect()
@@ -1006,6 +1017,8 @@ class UnrealCV(object):
             title: Title, defaults to "raw_img".
         """
         try:
+            from IPython.display import display  # type: ignore
+
             # Check if the image is a depth image (single channel)
             if len(img.shape) == 2:
                 # Normalize depth image for display
